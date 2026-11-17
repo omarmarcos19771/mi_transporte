@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17324d">
+<title>Mi Transporte Inteligente</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#172536;background:#f3f6f9}
+*{box-sizing:border-box}body{margin:0}.top{background:#17324d;color:white;padding:24px 18px 28px;border-radius:0 0 24px 24px}
+.top small{opacity:.8}.top h1{margin:8px 0 4px;font-size:25px}.top p{margin:0;color:#dce7f0}
+main{max-width:620px;margin:auto;padding:16px}.panel{background:white;border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 3px 14px #10283d0d}
+label{display:block;font-weight:650;margin:12px 0 6px}input{width:100%;padding:13px;border:1px solid #ccd6df;border-radius:11px;font:inherit;background:white}
+button,.linkbtn{border:0;border-radius:12px;padding:13px 15px;font:inherit;font-weight:650;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.primary{background:#1769aa;color:white;width:100%;margin-top:14px}.secondary{background:#eaf1f7;color:#17324d}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.service{background:#f5f8fb;border:1px solid #e0e7ed;color:#172536;min-height:76px;flex-direction:column}
+.service span{font-size:13px;font-weight:450;color:#607080}.muted{color:#647486;font-size:13px}.status{padding:10px 12px;background:#eef5fa;border-radius:11px;font-size:14px;margin-top:10px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions>*{flex:1}.favorite{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #edf0f3}
+footer{text-align:center;color:#718091;font-size:12px;padding:18px}
+</style>
+</head>
+<body>
+<header class="top">
+ <small>ASISTENTE DE MOVILIDAD</small>
+ <h1>🚗 Mi Transporte</h1>
+ <p>Encuentra opciones de transporte donde estés.</p>
+</header>
+<main>
+ <section class="panel">
+  <b>📍 Tu ubicación</b>
+  <div id="location" class="status">Aún no hemos detectado tu ubicación.</div>
+  <button class="secondary" style="width:100%;margin-top:10px" id="locate">Detectar mi ubicación</button>
+  <p class="muted">El GPS requiere que permitas el acceso a la ubicación. Si no funciona, puedes escribir el punto de recogida.</p>
+  <label for="pickup">Punto de recogida</label>
+  <input id="pickup" placeholder="Mi ubicación o una dirección">
+  <label for="destination">¿Adónde quieres ir?</label>
+  <input id="destination" placeholder="Escribe una dirección o lugar">
+  <button class="primary" id="search">Buscar transporte para este destino</button>
+ </section>
+ <section class="panel">
+  <b>🚕 Servicios y alternativas</b>
+  <p class="muted">Se abrirán las aplicaciones o búsquedas oficiales. La disponibilidad, tarifa y conductor se confirman en cada servicio.</p>
+  <div class="grid">
+   <a class="linkbtn service" id="uber" href="https://m.uber.com/ul/">🚘 Uber<span>Abrir solicitud</span></a>
+   <a class="linkbtn service" id="mapsTaxi" href="https://www.google.com/maps/search/taxi/">🚖 Taxis<span>Buscar cerca</span></a>
+   <a class="linkbtn service" id="99" href="https://99app.com/">🟡 99<span>Abrir servicio</span></a>
+   <a class="linkbtn service" id="mapsTransport" href="https://www.google.com/maps/search/transporte+p%C3%BAblico/">🚌 Transporte público<span>Ver opciones</span></a>
+  </div>
+  <div id="results" class="status">Primero detecta tu ubicación y escribe un destino para preparar los enlaces.</div>
+ </section>
+ <section class="panel">
+  <b>⭐ Destinos favoritos</b>
+  <div class="actions" style="margin-top:10px">
+   <input id="favName" placeholder="Nombre (ej. Casa)" aria-label="Nombre del favorito">
+   <button class="secondary" id="saveFav">Guardar</button>
+  </div>
+  <div id="favorites" class="muted" style="margin-top:10px">Todavía no tienes favoritos guardados.</div>
+ </section>
+ <section class="panel">
+  <b>🕘 Historial en este teléfono</b>
+  <div id="history" class="muted" style="margin-top:10px">Tus búsquedas recientes aparecerán aquí.</div>
+  <button class="secondary" id="clearHistory" style="margin-top:10px">Borrar historial</button>
+ </section>
+ <footer>Mi Transporte es un asistente independiente; no pertenece a Uber ni a 99 y no reserva ni cobra viajes.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let coords=null, cityText="";
+const read=(k,d=[])=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function encode(v){return encodeURIComponent(v)}
+function refresh(){
+ const favs=read('favorites');
+ $('favorites').innerHTML='';
+ if(!favs.length){$('favorites').textContent='Todavía no tienes favoritos guardados.';return}
+ favs.forEach((f,i)=>{let row=document.createElement('div');row.className='favorite';let name=document.createElement('button');name.className='secondary';name.textContent=f.name+' · '+f.address;name.onclick=()=>{$('destination').value=f.address;prepare()};let del=document.createElement('button');del.className='secondary';del.textContent='×';del.onclick=()=>{favs.splice(i,1);save('favorites',favs);refresh()};row.append(name,del);$('favorites').append(row)})
+}
+function history(){let h=read('history');$('history').textContent=h.length?h.slice(0,6).join(' · '):'Tus búsquedas recientes aparecerán aquí.'}
+function prepare(){
+ let p=$('pickup').value.trim()||cityText||'Mi ubicación actual', d=$('destination').value.trim();
+ if(!d){$('results').textContent='Escribe primero el destino.';return}
+ const q='desde '+p+' hasta '+d;
+ const uber='https://m.uber.com/ul/?action=setPickup&pickup[formatted_address]='+encode(p)+'&dropoff[formatted_address]='+encode(d);
+ $('uber').href=uber;
+ $('99').href='https://99app.com/';
+ $('mapsTaxi').href='https://www.google.com/maps/search/'+encode('taxi cerca de '+p);
+ $('mapsTransport').href='https://www.google.com/maps/dir/?api=1&origin='+encode(p)+'&destination='+encode(d)+'&travelmode=transit';
+ $('results').textContent='Solicitud preparada: '+q+'. Abre Uber o 99 para comprobar disponibilidad y precio; también puedes consultar taxis y transporte público en Maps.';
+ let h=read('history');h.unshift(q);save('history',h.slice(0,12));history();
+}
+$('locate').onclick=()=>{
+ if(!navigator.geolocation){$('location').textContent='Este navegador no ofrece GPS. Escribe tu dirección manualmente.';return}
+ $('location').textContent='Solicitando permiso de ubicación…';
+ navigator.geolocation.getCurrentPosition(async pos=>{
+  coords={lat:pos.coords.latitude,lon:pos.coords.longitude};
+  $('pickup').value=coords.lat.toFixed(5)+', '+coords.lon.toFixed(5);
+  $('location').textContent='Ubicación detectada. Buscando ciudad…';
+  try{
+   let r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+coords.lat+'&lon='+coords.lon);
+   let j=await r.json();cityText=j.display_name||$('pickup').value;
+   $('location').textContent=cityText;
+   $('pickup').value=cityText;
+  }catch{$('location').textContent='GPS detectado. No se pudo obtener el nombre de la dirección; puedes continuar.'}
+ },err=>{$('location').textContent='No se pudo acceder al GPS: '+err.message+'. Escribe la dirección manualmente.'},{enableHighAccuracy:true,timeout:12000});
+};
+$('search').onclick=prepare;
+$('saveFav').onclick=()=>{let n=$('favName').value.trim(),a=$('destination').value.trim();if(!n||!a){alert('Escribe un nombre y un destino.');return}let f=read('favorites');f.push({name:n,address:a});save('favorites',f);$('favName').value='';refresh()};
+$('clearHistory').onclick=()=>{save('history',[]);history()};
+refresh();history();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}</script>
+</body></html>
